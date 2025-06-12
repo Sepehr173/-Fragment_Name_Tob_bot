@@ -1,43 +1,42 @@
-import openai
-import base64
+import requests
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
-import random
 
-openai.api_key = "YOUR_OPENAI_API_KEY"
-
-def generate_image_with_text(text):
-    # Create blank image
-    img = Image.new('RGB', (512, 512), color=(30, 30, 30))
-    d = ImageDraw.Draw(img)
-
+# دریافت قیمت یوزرنیم از Fragment
+def get_username_price(username):
+    url = f"https://fragment.com/username/{username}"
     try:
-        font = ImageFont.truetype("arial.ttf", 24)
+        response = requests.get(url)
+        if response.status_code == 200:
+            if "Minimum bid" in response.text:
+                start_index = response.text.find("Minimum bid")
+                text = response.text[start_index:start_index+100]
+                price = text.split("Ⓝ")[1].split("<")[0].strip()
+                return f"{price} TON"
+            elif "Current bid" in response.text:
+                start_index = response.text.find("Current bid")
+                text = response.text[start_index:start_index+100]
+                price = text.split("Ⓝ")[1].split("<")[0].strip()
+                return f"{price} TON"
+            else:
+                return "Price not found"
+        else:
+            return "Username not available"
     except:
-        font = ImageFont.load_default()
+        return "Error fetching price"
 
-    d.text((10, 10), text, font=font, fill=(255, 255, 255))
-    buffer = BytesIO()
-    img.save(buffer, format="PNG")
-    buffer.seek(0)
+# ساخت تصویر با قیمت و یوزرنیم
+def generate_price_image(username, price):
+    img = Image.new('RGB', (500, 250), color=(30, 30, 30))
+    draw = ImageDraw.Draw(img)
 
-    return buffer
+    # فونت پیش‌فرض
+    font = ImageFont.load_default()
 
-async def evaluate_username(username):
-    prompt = f"Evaluate the value and uniqueness of this Telegram username: @{username}."
+    draw.text((20, 60), f"@{username}", font=font, fill=(255, 255, 255))
+    draw.text((20, 130), f"Price: {price}", font=font, fill=(0, 255, 0))
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "You are an expert in digital brand names."},
-            {"role": "user", "content": prompt}
-        ]
-    )
-
-    result_text = response['choices'][0]['message']['content']
-    image = generate_image_with_text(f"@{username}\n\n{result_text[:150]}...")
-
-    return {
-        "text": f"💎 بررسی نام کاربری: @{username}\n\n{result_text}",
-        "image": image
-    }
+    byte_io = BytesIO()
+    img.save(byte_io, 'PNG')
+    byte_io.seek(0)
+    return byte_io
